@@ -5,7 +5,7 @@
 
 class main_window : public window
 {
-	virtual INT_PTR WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) override
+	virtual INT_PTR WindowProc(HWND, UINT message, WPARAM wParam, LPARAM lParam) override
 	{
 		switch (message)
 		{
@@ -17,18 +17,17 @@ class main_window : public window
 		}
 		return 0;
 	}
-	BOOL OnCreate(HWND hwnd, LPCREATESTRUCT lpCreateStruct)
+	BOOL OnCreate(HWND, LPCREATESTRUCT)
 	{
-
 		return TRUE;
 	}
-	void OnDestroy(HWND hwnd)
+	void OnDestroy(HWND)
 	{
 		PostQuitMessage(0);
 	}
 };
 
-int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR, _In_ int)
+int WINAPI wWinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPWSTR, _In_ int)
 {
 	// 设置高 DPI 支持。
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
