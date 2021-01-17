@@ -86,7 +86,7 @@ public:
 	}
 
 private:
-	std::wstring matched_window_text{ L"SetMouse" };
+	const std::wstring matched_window_text{ L"SetMouse" };
 
 private:
 	timer_thread tt{ std::bind(&main_window::bg_routine, this), 100 };
