@@ -83,20 +83,30 @@ public:
 		AttachThreadInput(GetCurrentThreadId(), dwThreadId, FALSE);
 		return hwnd;
 	}
+	/// <summary>
+	/// 获取窗口标题。
+	/// </summary>
+	/// <param name="hwnd">窗口句柄。</param>
+	/// <returns>窗口标题。若窗口句柄无效，返回一个空字符串。</returns>
 	static std::wstring MyGetWindowText(HWND hwnd)
 	{
 		std::wstring ret(GetWindowTextLengthW(hwnd), L'\0');
 		if (ret.length())
-			GetWindowTextW(hwnd, ret.data(), ret.length() + 1);
+			GetWindowTextW(hwnd, ret.data(), static_cast<int>(ret.length() + 1));
 		return ret;
 	}
 
 private:
+	std::wstring matched_window_text{ L"SetMouse" };
+
+private:
 	timer_thread tt{ std::bind(&main_window::bg_routine, this), 500 };
+	/// <summary>
+	/// 背景例程。每过 500 毫秒执行一次。
+	/// </summary>
 	void bg_routine()
 	{
 		using namespace std::string_literals;
-		auto matched_window_text = L"Memory Cleaner"s;
 		if (MyGetWindowText(MyGetFocus()) == matched_window_text)
 			disable_mouse_acceleration();
 		else
