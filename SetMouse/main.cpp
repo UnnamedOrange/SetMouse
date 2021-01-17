@@ -1,4 +1,7 @@
-﻿#include <Windows.h>
+﻿// Copyright (c) UnnamedOrange. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+#include <Windows.h>
 #undef min
 #undef max
 #include <string>

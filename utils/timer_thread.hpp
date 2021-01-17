@@ -1,4 +1,9 @@
-﻿#include <functional>
+﻿// Copyright (c) UnnamedOrange. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+#pragma once
+
+#include <functional>
 #include <thread>
 #include <mutex>
 #include <condition_variable>

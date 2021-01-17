@@ -1,6 +1,5 @@
-﻿/// <summary>
-/// 封装的窗口基类。包含此文件即可使用。
-/// </summary>
+﻿// Copyright (c) UnnamedOrange. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 #pragma once
 
