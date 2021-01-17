@@ -31,6 +31,31 @@ class main_window final : public window
 	}
 
 private:
+	static void spi_interface(UINT uiAction, const int pvParam[3])
+	{
+		// 含危险代码。该函数不对外暴露，以保证安全性。
+		if (!SystemParametersInfoW(uiAction, NULL, const_cast<int*>(pvParam), NULL))
+			throw std::runtime_error("fail to SystemParametersInfoW.");
+	}
+public:
+	static bool query_mouse_acceleration()
+	{
+		int params[3];
+		spi_interface(SPI_GETMOUSE, params);
+		return params[2];
+	}
+	static void enable_mouse_acceleration()
+	{
+		constexpr int params[3]{ 6, 10, 1 };
+		spi_interface(SPI_SETMOUSE, params);
+	}
+	static void disable_mouse_acceleration()
+	{
+		constexpr int params[3]{};
+		spi_interface(SPI_SETMOUSE, params);
+	}
+
+private:
 	timer_thread tt{ std::bind(&main_window::bg_routine, this), 500 };
 	void bg_routine()
 	{
