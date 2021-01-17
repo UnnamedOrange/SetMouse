@@ -70,20 +70,6 @@ public:
 
 public:
 	/// <summary>
-	/// 取焦点窗口句柄。
-	/// </summary>
-	/// <returns>焦点窗口句柄。</returns>
-	static HWND MyGetFocus()
-	{
-		HWND hwnd;
-		DWORD dwThreadId;
-		dwThreadId = GetWindowThreadProcessId(GetForegroundWindow(), 0);
-		AttachThreadInput(GetCurrentThreadId(), dwThreadId, TRUE);
-		hwnd = GetFocus();
-		AttachThreadInput(GetCurrentThreadId(), dwThreadId, FALSE);
-		return hwnd;
-	}
-	/// <summary>
 	/// 获取窗口标题。
 	/// </summary>
 	/// <param name="hwnd">窗口句柄。</param>
@@ -100,14 +86,14 @@ private:
 	std::wstring matched_window_text{ L"SetMouse" };
 
 private:
-	timer_thread tt{ std::bind(&main_window::bg_routine, this), 500 };
+	timer_thread tt{ std::bind(&main_window::bg_routine, this), 100 };
 	/// <summary>
 	/// 背景例程。每过 500 毫秒执行一次。
 	/// </summary>
 	void bg_routine()
 	{
 		using namespace std::string_literals;
-		if (MyGetWindowText(MyGetFocus()) == matched_window_text)
+		if (MyGetWindowText(GetForegroundWindow()) == matched_window_text)
 			disable_mouse_acceleration();
 		else
 			enable_mouse_acceleration();
