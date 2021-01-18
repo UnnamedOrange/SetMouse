@@ -70,6 +70,17 @@ public:
 		constexpr int params[3]{};
 		spi_interface(SPI_SETMOUSE, params);
 	}
+	/// <summary>
+	/// 打开或关闭鼠标加速。
+	/// </summary>
+	/// <param name="enable">是否打开鼠标加速。</param>
+	static void set_mouse_acceleration(bool enable)
+	{
+		if (enable)
+			enable_mouse_acceleration();
+		else
+			disable_mouse_acceleration();
+	}
 
 public:
 	/// <summary>
@@ -96,10 +107,8 @@ private:
 	void bg_routine()
 	{
 		using namespace std::string_literals;
-		if (MyGetWindowText(GetForegroundWindow()) == matched_window_text)
-			disable_mouse_acceleration();
-		else
-			enable_mouse_acceleration();
+		bool matched = MyGetWindowText(GetForegroundWindow()) == matched_window_text;
+		set_mouse_acceleration(!matched);
 	}
 };
 
@@ -121,9 +130,13 @@ int WINAPI wWinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPWSTR, _In_ int)
 		return 1;
 
 	// 窗口与主循环。
-	main_window wnd;
-	wnd.create();
-	wnd.message_loop();
+	bool previous_setting = main_window::query_mouse_acceleration();
+	{
+		main_window wnd;
+		wnd.create();
+		wnd.message_loop();
+	}
+	main_window::set_mouse_acceleration(previous_setting);
 
 	// 关闭单例中用到的句柄。
 	CloseHandle(hMutex);
