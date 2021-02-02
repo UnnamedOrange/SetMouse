@@ -8,8 +8,7 @@
 #include <string_view>
 #include <unordered_set>
 #include <optional>
-#include <mutex>
-#include <condition_variable>
+#include <semaphore>
 #include <stdexcept>
 #include <typeinfo>
 #include <concepts>
@@ -326,8 +325,7 @@ public:
 	}
 
 private:
-	inline static std::mutex mutex_create; // 创建窗口时所用的互斥体，创建窗口的过程必须是串行的。
-	inline static std::condition_variable cv_create; // // 创建窗口时所用的条件变量，用于模拟信号量。创建窗口的过程必须是串行的。
+	inline static std::binary_semaphore semaphore_create{ 1 }; // 创建窗口时所用的信号量，创建窗口的过程必须是互斥的。
 	inline static window* storage{}; // 创建窗口时所用的全局变量。
 
 private:
@@ -367,7 +365,7 @@ private:
 			p->__hwnd = hwnd;
 
 			storage = nullptr;
-			cv_create.notify_one();
+			semaphore_create.release();
 		}
 		LRESULT ret = p->WindowProc(hwnd, message, wParam, lParam);
 
@@ -389,16 +387,11 @@ public:
 	/// </returns>
 	HWND create(HWND hwndParent = nullptr)
 	{
-		std::unique_lock<std::mutex> lock(mutex_create);
-		cv_create.wait(lock, []()->bool
-			{
-				return !storage;
-			});
+		semaphore_create.acquire();
 		storage = this;
-		lock.unlock();
 
 		register_class();
-		return CreateWindowExW(0,
+		HWND ret = CreateWindowExW(0,
 			get_class_name().c_str(),
 			L"",
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
@@ -410,6 +403,9 @@ public:
 			nullptr,
 			GetModuleHandleA(nullptr),
 			nullptr);
+		if (!ret)
+			semaphore_create.release();
+		return ret;
 	}
 
 public:
