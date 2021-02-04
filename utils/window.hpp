@@ -17,17 +17,45 @@
 #undef max
 #include <windowsx.h>
 
-#include <utils/code_conv.hpp>
+#include "code_conv.hpp"
 
 /// <summary>
 /// window 基类。
+/// window 类的生命周期必须包含窗口的生命周期。
+/// window 不可复制，但可以移动。不可在窗口过程中进行移动操作。
 /// </summary>
 class window
 {
 private:
 	HWND __hwnd{};
+	std::atomic<int> __in_proc{}; // 是否在窗口过程中。
 public:
 	const HWND& hwnd{ __hwnd }; // 窗口句柄的常值引用。
+public:
+	window() = default;
+	window(const window&) = delete;
+	window(window&& another) noexcept : __hwnd{}, hwnd{ __hwnd }, __in_proc{}
+	{
+		*this = std::move(another);
+	}
+	window& operator=(const window&) = delete;
+	window& operator=(window&& another) noexcept
+	{
+		if (this != &another)
+		{
+			if (hwnd)
+				DestroyWindow(hwnd);
+			__hwnd = another.hwnd;
+			__in_proc = 0;
+			if (hwnd)
+			{
+				another.__hwnd = nullptr;
+				SetWindowLongPtrW(hwnd, GWLP_USERDATA,
+					reinterpret_cast<LONG_PTR>(this));
+			}
+		}
+		return *this;
+	}
 
 private:
 	RECT get_window_rect() const
@@ -263,13 +291,12 @@ public:
 	/// <typeparam name="int_t">整数类型。</typeparam>
 	/// <param name="val">要缩放的值。</param>
 	/// <returns>缩放后的值，保持类型不变。</returns>
-	template <typename int_t>
-	std::decay_t<int_t> dpi(int_t val) const
-		requires std::is_integral_v<int_t>
+	template <std::integral int_t>
+	auto dpi(int_t val) const
 	{
 		if (!hwnd)
 			throw std::runtime_error("hwnd is nullptr.");
-		return static_cast<int_t>(static_cast<double>(val) * dpi());
+		return static_cast<std::decay_t<int_t>>(static_cast<double>(val) * dpi());
 	}
 	/// <summary>
 	/// 根据窗口的 DPI 计算缩放后的浮点数。
@@ -277,13 +304,12 @@ public:
 	/// <typeparam name="int_t">浮点数类型。</typeparam>
 	/// <param name="val">要缩放的值。</param>
 	/// <returns>缩放后的值，保持类型不变。</returns>
-	template <typename float_t>
-	std::decay_t<float_t> dpi(float_t val) const
-		requires std::is_floating_point_v<float_t>
+	template <std::floating_point float_t>
+	auto dpi(float_t val) const
 	{
 		if (!hwnd)
 			throw std::runtime_error("hwnd is nullptr.");
-		return static_cast<float_t>(static_cast<double>(val) * dpi());
+		return static_cast<std::decay_t<float_t>>(static_cast<double>(val) * dpi());
 	}
 
 public:
@@ -329,9 +355,11 @@ private:
 	inline static window* storage{}; // 创建窗口时所用的全局变量。
 
 private:
+	inline static std::binary_semaphore semaphore_register{ 1 }; // 注册窗口的过程必须是互斥的。
+	inline static std::unordered_set<std::wstring> registered; // 已注册的窗口类名。
 	void register_class()
 	{
-		static std::unordered_set<std::wstring> registered;
+		semaphore_register.acquire();
 		auto name = get_class_name();
 		if (registered.count(name))
 			return;
@@ -344,13 +372,17 @@ private:
 		wcex.hInstance = GetModuleHandleA(nullptr);
 		wcex.hIcon = nullptr;
 		wcex.hIconSm = nullptr;
-		wcex.hCursor = LoadCursorW(NULL, IDC_ARROW);
+		wcex.hCursor = LoadCursorW(nullptr, IDC_ARROW);
 		wcex.hbrBackground = GetSysColorBrush(COLOR_WINDOW);
-		wcex.lpszMenuName = NULL;
+		wcex.lpszMenuName = nullptr;
 		wcex.lpszClassName = name.c_str();
 		if (!RegisterClassExW(&wcex))
+		{
+			semaphore_register.release();
 			throw std::runtime_error("fail to RegisterClassExW.");
+		}
 		registered.insert(name);
+		semaphore_register.release();
 	}
 	static LRESULT CALLBACK VirtualWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
@@ -367,9 +399,11 @@ private:
 			storage = nullptr;
 			semaphore_create.release();
 		}
+		++p->__in_proc;
 		LRESULT ret = p->WindowProc(hwnd, message, wParam, lParam);
+		--p->__in_proc;
 
-		if (p && message == WM_DESTROY)
+		if (p && message == WM_NCDESTROY)
 			p->__hwnd = nullptr;
 
 		return ret;
@@ -393,7 +427,7 @@ public:
 		register_class();
 		HWND ret = CreateWindowExW(0,
 			get_class_name().c_str(),
-			L"",
+			nullptr,
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -401,7 +435,7 @@ public:
 			CW_USEDEFAULT,
 			hwndParent,
 			nullptr,
-			GetModuleHandleA(nullptr),
+			GetModuleHandleW(nullptr),
 			nullptr);
 		if (!ret)
 			semaphore_create.release();
@@ -415,13 +449,21 @@ public:
 	/// <returns>
 	/// 退出消息的返回值。
 	/// </returns>
-	int message_loop()
+	static int message_loop()
 	{
 		MSG msg;
-		while (GetMessageW(&msg, NULL, 0, 0))
+		BOOL ret;
+		while ((ret = GetMessageW(&msg, nullptr, 0, 0)) != 0)
 		{
-			TranslateMessage(&msg);
-			DispatchMessageW(&msg);
+			if (~ret)
+			{
+				TranslateMessage(&msg);
+				DispatchMessageW(&msg);
+			}
+			else
+			{
+				throw std::runtime_error("fatal application error.");
+			}
 		}
 		return (int)msg.wParam;
 	}
